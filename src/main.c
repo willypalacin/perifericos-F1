@@ -1,18 +1,47 @@
-
 #include "stm32f4xx.h"
-void delay(int counter)
-{
-	int i;
-	for (i = 0; i < counter * 10000; i++) {}
+
+//CONSTANTS
+#define TRUE 1
+
+#define GREEN_LED_13 GPIO_Pin_13
+#define RED_LED_14 GPIO_Pin_14
+#define USER_BUTTON GPIO_Pin_0
+
+
+//VARIABLES
+static uint16_t tics = 0;
+
+//Init clock
+void init_clock(void){
+	//Posem la config per defecte
+	RCC_DeInit();
 }
-int main(void)
-{
+
+//Configuració boto usuari
+void init_button(void){
 	GPIO_InitTypeDef gpio;
-	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOG, ENABLE);
-	GPIO_StructInit(&gpio); gpio.GPIO_Pin = GPIO_Pin_13; gpio.GPIO_Mode = GPIO_Mode_OUT; GPIO_Init(GPIOG, &gpio);
-	GPIO_SetBits(GPIOG, GPIO_Pin_13);
-	while (1) {
-		GPIO_SetBits(GPIOG, GPIO_Pin_13); // LED ON delay(400);
-		GPIO_ResetBits(GPIOG, GPIO_Pin_13); // LED OFF delay(400);
+
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+	GPIO_StructInit(&gpio);
+
+	gpio.GPIO_Pin = USER_BUTTON;
+	gpio.GPIO_Mode = GPIO_Mode_IN;
+	gpio.GPIO_PuPd = GPIO_PuPd_DOWN;
+
+	GPIO_Init(GPIOA, &gpio);
+}
+
+//Crida de tots els inits
+void inicialitza_sistema(void){
+	init_clock();
+	init_button();
+
+}
+
+void main(void){
+	inicialitza_sistema();
+	while (TRUE) {
+		calcula_temps_injecció();
+		espera_interrupció();
 	}
 }
