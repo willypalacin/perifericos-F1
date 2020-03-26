@@ -10,7 +10,7 @@
 
 
 #include "stm32f4xx.h"
-			
+
 //CONSTANTS
 #define TRUE 1
 #define USER_BUTTON GPIO_Pin_0
@@ -32,13 +32,6 @@ uint16_t rev_min = 0;
 uint16_t frec = 2000;
 uint16_t array_cargar[16] = {479,239,159,119,95,79,67,59,52,47,42,39,35,33,31};
 uint16_t flag_decrementa = 1;
-
-
-
-
-
-
-
 
 
 
@@ -91,7 +84,7 @@ void init_switch(void){
 }
 
 //Configuració de la interrupció del injector a del switch
-void init_injector_a_interrupt1(void){
+void init_injector_a_interrupt(void){
 
 
                 //RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
@@ -125,7 +118,7 @@ void init_injector_a_interrupt1(void){
 }
 
 //Configuració de la interrupció del injector b del switch
-void init_injector_a_interrupt2(void){
+void init_injector_b_interrupt(void){
 
 
                 //RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
@@ -161,7 +154,7 @@ void init_injector_a_interrupt2(void){
 }
 
 //Configuració de la interrupció del injector c del switch
-void init_injector_a_interrupt3(void){
+void init_injector_c_interrupt(void){
 
 
                 //RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
@@ -226,12 +219,6 @@ void EXTI9_5_IRQHandler(void) {
 }
 
 
-
-
-
-
-
-
 void delay(int counter)
 {
 	int i;
@@ -288,8 +275,6 @@ void INTTIM_Config(uint16_t numOfMilleseconds){
 }
 
 
-
-
 void configuraGPIOG13() {
 	GPIO_InitTypeDef gpio;
 	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOG, ENABLE);
@@ -299,27 +284,38 @@ void configuraGPIOG13() {
 	GPIO_Init(GPIOG, &gpio);
 }
 
+static uint16_t milis_rebots = 0;
 
 void TIM2_IRQHandler(void){
   if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET){
 
 	  TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
 
-
 	  if (GPIO_ReadInputDataBit(GPIOA, USER_BUTTON) == TRUE){
 		  //Boto pulsat!!!
 		  btn_pressed = 1;
-		  if (rev_min == 15)  flag_decrementa = -1;
-		  if (rev_min == 0) flag_decrementa = 1;
 
-		  rev_min = (rev_min + flag_decrementa);
-		  TM_TIMER_Init();
-		  TM_PWM_Init();
-		  TM_LEDS_Init();
-		  GPIO_SetBits(GPIOG, GPIO_Pin_13);
+		  milis_rebots++;
+		  if (milis_rebots == 20){
+
+			  milis_rebots = 0;
+
+			  if (rev_min == 15)  flag_decrementa = -1;
+			  if (rev_min == 0) flag_decrementa = 1;
+
+			  rev_min = (rev_min + flag_decrementa);
+			  TM_TIMER_Init();
+			  TM_PWM_Init();
+			  TM_LEDS_Init();
+			  GPIO_SetBits(GPIOG, GPIO_Pin_13);
+		  }
+
 	  } else{
+
+		  milis_rebots = 0;
 		  btn_pressed=0;
 		  GPIO_ResetBits(GPIOG, GPIO_Pin_13);
+
 	  }
 	  //INTTIM_Config(100);*/
 
@@ -495,6 +491,9 @@ void inicialitza_sistema(void){
 	TM_TIMER_Init();
 	TM_PWM_Init();
 	TM_LEDS_Init();
+	init_injector_a_interrupt();
+	init_injector_b_interrupt();
+	init_injector_c_interrupt();
 }
 
 int main(void) {
