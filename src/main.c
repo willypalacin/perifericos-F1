@@ -14,11 +14,6 @@
 //CONSTANTS
 #define TRUE 1
 #define USER_BUTTON GPIO_Pin_0
-#include "stm32f4xx.h"
-
-//CONSTANTS
-#define TRUE 1
-#define USER_BUTTON GPIO_Pin_0
 #define INJECTOR_GPIO_A GPIO_Pin_2
 #define INJECTOR_GPIO_B GPIO_Pin_4
 #define INJECTOR_GPIO_C GPIO_Pin_6
