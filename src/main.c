@@ -1,9 +1,9 @@
 /**
   ******************************************************************************
   * @file    main.c
-  * @author  Ac6
+  * @author  Guillermo Palacin, Llorenc Garcia
   * @version V1.0
-  * @date    01-December-2013
+  * @date    01-Marzo-2020
   * @brief   Default main function.
   ******************************************************************************
 */
@@ -32,6 +32,8 @@ uint16_t rev_min = 0;
 uint16_t frec = 2000;
 uint16_t array_cargar[16] = {479,239,159,119,95,79,67,59,52,47,42,39,35,33,31};
 uint16_t flag_decrementa = 1;
+uint16_t entra = 0;
+
 
 
 
@@ -222,7 +224,7 @@ void EXTI9_5_IRQHandler(void) {
 void delay(int counter)
 {
 	int i;
-	for (i = 0; i < counter * 10000; i++) {}
+	for (i = 0; i < counter * 100000; i++) {}
 }
 
 void INTTIM_Config(uint16_t numOfMilleseconds){
@@ -250,10 +252,9 @@ void INTTIM_Config(uint16_t numOfMilleseconds){
 
   TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
 
-  TIM_TimeBaseStructure.TIM_Period = (500*numOfMilleseconds) - 1;  // 1 MHz down to 1 KHz (1 ms)
+  TIM_TimeBaseStructure.TIM_Period = (7*numOfMilleseconds);
 
-  TIM_TimeBaseStructure.TIM_Prescaler = 84 - 1; // 24 MHz Clock down to 1 MHz (adjust per your clock)
-
+  TIM_TimeBaseStructure.TIM_Prescaler = 10499;
   //TIM_TimeBaseStructure.TIM_Prescaler = 168-1; //168MHz Clock should be down to 1MHz
 
   TIM_TimeBaseStructure.TIM_ClockDivision = 0;
@@ -288,33 +289,46 @@ static uint16_t milis_rebots = 0;
 
 void TIM2_IRQHandler(void){
   if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET){
+	  /*if(entra==0) {
+		  GPIO_SetBits(GPIOG, GPIO_Pin_13);
+		  entra = 1;
+
+	  } else {
+		  GPIO_ResetBits(GPIOG, GPIO_Pin_13);
+		  	  entra = 0;
+	  }*/
+
 
 	  TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
+
 
 	  if (GPIO_ReadInputDataBit(GPIOA, USER_BUTTON) == TRUE){
 		  //Boto pulsat!!!
 		  btn_pressed = 1;
 
+
 		  milis_rebots++;
-		  if (milis_rebots == 20){
+		  if (milis_rebots == 100){
 
 			  milis_rebots = 0;
 
 			  if (rev_min == 15)  flag_decrementa = -1;
 			  if (rev_min == 0) flag_decrementa = 1;
 
+
 			  rev_min = (rev_min + flag_decrementa);
+
 			  TM_TIMER_Init();
 			  TM_PWM_Init();
 			  TM_LEDS_Init();
-			  GPIO_SetBits(GPIOG, GPIO_Pin_13);
+			  //GPIO_SetBits(GPIOG, GPIO_Pin_13);
 		  }
 
 	  } else{
 
 		  milis_rebots = 0;
 		  btn_pressed=0;
-		  GPIO_ResetBits(GPIOG, GPIO_Pin_13);
+		 // GPIO_ResetBits(GPIOG, GPIO_Pin_13);
 
 	  }
 	  //INTTIM_Config(100);*/
@@ -333,15 +347,11 @@ void TM_TIMER_Init(void) {
 	Remember: Not each timer is connected to APB1, there are also timers connected
 	on APB2, which works at 84MHz by default, and internal PLL increase
 	this to up to 168MHz
-
 	Set timer prescaller
 	Timer count frequency is set with
-
 	timer_tick_frequency = Timer_default_frequency / (prescaller_set + 1)
-
 	In our case, we want a max frequency for timer, so we set prescaller to 0
 	And our timer will have tick frequency
-
 	timer_tick_frequency = 84000000 / (0 + 1) = 84000000
 */
 	TIM_BaseStruct.TIM_Prescaler = 10499;
@@ -352,17 +362,11 @@ void TM_TIMER_Init(void) {
 	First you have to know max value for timer
 	In our case it is 16bit = 65535
 	To get your frequency for PWM, equation is simple
-
 	PWM_frequency = timer_tick_frequency / (TIM_Period + 1)
-
 	If you know your PWM frequency you want to have timer period set correct
-
 	TIM_Period = timer_tick_frequency / PWM_frequency - 1
-
 	In our case, for 10Khz PWM_frequency, set Period to
-
 	TIM_Period = 84000000 / 10000 - 1 = 8399
-
 	If you get TIM_Period larger than max timer value (in our case 65535),
 	you have to choose larger prescaler and slow down timer tick frequency
 */
@@ -390,23 +394,19 @@ void TM_PWM_Init(void) {
 
 /*
     To get proper duty cycle, you have simple equation
-
     pulse_length = ((TIM_Period + 1) * DutyCycle) / 100 - 1
-
     where DutyCycle is in percent, between 0 and 100%
-
     25% duty cycle:     pulse_length = ((8399 + 1) * 25) / 100 - 1 = 2099
     50% duty cycle:     pulse_length = ((8399 + 1) * 50) / 100 - 1 = 4199
     75% duty cycle:     pulse_length = ((8399 + 1) * 75) / 100 - 1 = 6299
     100% duty cycle:    pulse_length = ((8399 + 1) * 100) / 100 - 1 = 8399
-
     Remember: if pulse_length is larger than TIM_Period, you will have output HIGH all the time
 */      uint16_t  pulse_length = ((max_tics + 1) * 25) / 100 - 1;
         TIM_OCStruct.TIM_Pulse = pulse_length; /* 25% duty cycle */
         TIM_OC1Init(TIM4, &TIM_OCStruct);
         TIM_OC1PreloadConfig(TIM4, TIM_OCPreload_Enable);
 
-        pulse_length = ((max_tics + 1) * 50) / 100 - 1;
+        pulse_length = ((max_tics + 1) * 54) / 100 - 1;
         TIM_OCStruct.TIM_Pulse = pulse_length; /* 50% duty cycle */
         TIM_OC2Init(TIM4, &TIM_OCStruct);
         TIM_OC2PreloadConfig(TIM4, TIM_OCPreload_Enable);
@@ -498,7 +498,7 @@ void inicialitza_sistema(void){
 
 int main(void) {
 	inicialitza_sistema();
-	INTTIM_Config(2);
+	INTTIM_Config(1);
     configuraGPIOG13();
     while(1) {}
     //TM_TIMER_Init(); //Timer4
