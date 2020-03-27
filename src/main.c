@@ -26,15 +26,14 @@
 
 
 //VARIABLES
-static uint16_t tics = 0;
-uint16_t btn_pressed = 0;
 uint16_t rev_min = 0;
 uint16_t frec = 2000;
 uint16_t array_cargar[16] = {479,239,159,119,95,79,67,59,52,47,42,39,35,33,31};
 uint16_t flag_decrementa = 1;
+uint16_t milis_rebots = 0;
+
+//BORRAR ANTES DE ENTREGAR
 uint16_t entra = 0;
-
-
 
 
 
@@ -53,7 +52,6 @@ void init_switch(void){
                 gpio_a.GPIO_PuPd = GPIO_PuPd_UP;
                 //Carreguem configuració pin
                 GPIO_Init(GPIOD, &gpio_a);
-
 
                 GPIO_InitTypeDef gpio_b;
 
@@ -285,7 +283,6 @@ void configuraGPIOG13() {
 	GPIO_Init(GPIOG, &gpio);
 }
 
-static uint16_t milis_rebots = 0;
 
 void TIM2_IRQHandler(void){
   if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET){
@@ -304,8 +301,6 @@ void TIM2_IRQHandler(void){
 
 	  if (GPIO_ReadInputDataBit(GPIOA, USER_BUTTON) == TRUE){
 		  //Boto pulsat!!!
-		  btn_pressed = 1;
-
 
 		  milis_rebots++;
 		  if (milis_rebots == 100){
@@ -327,7 +322,6 @@ void TIM2_IRQHandler(void){
 	  } else{
 
 		  milis_rebots = 0;
-		  btn_pressed=0;
 		 // GPIO_ResetBits(GPIOG, GPIO_Pin_13);
 
 	  }
