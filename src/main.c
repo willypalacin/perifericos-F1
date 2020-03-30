@@ -1,14 +1,9 @@
-/**
-  ******************************************************************************
-  * @file    main.c
-  * @author  Guillermo Palacin, Llorenc Garcia
-  * @version V1.0
-  * @date    01-Marzo-2020
-  * @brief   Default main function.
-  ******************************************************************************
-*/
 
+#include "stm32f4xx.h"
 
+//CONSTANTS
+#define TRUE 1
+#define USER_BUTTON GPIO_Pin_0
 #include "stm32f4xx.h"
 
 //CONSTANTS
@@ -21,14 +16,19 @@
 
 
 //VARIABLES
+static uint16_t tics = 0;
+uint16_t btn_pressed = 0;
 uint16_t rev_min = 0;
 uint16_t frec = 2000;
 uint16_t array_cargar[16] = {479,239,159,119,95,79,67,59,52,47,42,39,35,33,31};
 uint16_t flag_decrementa = 1;
-uint16_t milis_rebots = 0;
-
-//BORRAR ANTES DE ENTREGAR
 uint16_t entra = 0;
+static uint16_t milis_rebots = 0;
+static uint16_t cont_10micros = 0;
+static uint16_t velocidad = 0;
+uint16_t cont_ms = 0;
+
+
 
 
 
@@ -47,6 +47,7 @@ void init_switch(void){
                 gpio_a.GPIO_PuPd = GPIO_PuPd_UP;
                 //Carreguem configuració pin
                 GPIO_Init(GPIOD, &gpio_a);
+
 
                 GPIO_InitTypeDef gpio_b;
 
@@ -76,6 +77,66 @@ void init_switch(void){
                 gpio_c.GPIO_PuPd = GPIO_PuPd_UP;
                 //Carreguem configuració pin
                 GPIO_Init(GPIOD, &gpio_c);
+}
+
+void EXTI1_IRQHandler(void) {
+
+    /* Make sure that interrupt flag is set */
+    if (EXTI_GetITStatus(EXTI_Line1) != RESET) {
+    	cont_ms=(uint16_t)cont_10micros/100;
+    	velocidad=(uint16_t)(60000/(cont_ms*2)); //xq cuenta cada 10 micros segun los tics
+
+    	cont_10micros = 0;
+
+        /* Clear interrupt flag */
+        EXTI_ClearITPendingBit(EXTI_Line1);
+    }
+}
+
+void Configure_PD1(void) {
+    /* Set variables used */
+    GPIO_InitTypeDef GPIO_InitStruct;
+    EXTI_InitTypeDef EXTI_InitStruct;
+    NVIC_InitTypeDef NVIC_InitStruct;
+
+    /* Enable clock for GPIOD */
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
+    /* Enable clock for SYSCFG */
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
+
+    /* Set pin as input */
+    GPIO_InitStruct.GPIO_Mode = GPIO_Mode_IN;
+    GPIO_InitStruct.GPIO_OType = GPIO_OType_PP;
+    GPIO_InitStruct.GPIO_Pin = GPIO_Pin_1;
+    GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_NOPULL;
+    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_100MHz;
+    GPIO_Init(GPIOD, &GPIO_InitStruct);
+
+    /* Tell system that you will use PD0 for EXTI_Line0 */
+    SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOD, EXTI_PinSource1);
+
+    /* PD0 is connected to EXTI_Line0 */
+    EXTI_InitStruct.EXTI_Line = EXTI_Line1;
+    /* Enable interrupt */
+    EXTI_InitStruct.EXTI_LineCmd = ENABLE;
+    /* Interrupt mode */
+    EXTI_InitStruct.EXTI_Mode = EXTI_Mode_Interrupt;
+    /* Triggers on rising and falling edge */
+    EXTI_InitStruct.EXTI_Trigger = EXTI_Trigger_Rising;
+    /* Add to EXTI */
+    EXTI_Init(&EXTI_InitStruct);
+
+    /* Add IRQ vector to NVIC */
+    /* PD0 is connected to EXTI_Line0, which has EXTI0_IRQn vector */
+    NVIC_InitStruct.NVIC_IRQChannel = EXTI1_IRQn;
+    /* Set priority */
+    NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 0x00;
+    /* Set sub priority */
+    NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0x00;
+    /* Enable interrupt */
+    NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
+    /* Add to NVIC */
+    NVIC_Init(&NVIC_InitStruct);
 }
 
 //Configuració de la interrupció del injector a del switch
@@ -166,7 +227,7 @@ void init_injector_c_interrupt(void){
                 EXTI_InitStruct.EXTI_Mode = EXTI_Mode_Interrupt;
                 /* Triggers on rising and falling edge */
                 //Posem que interrompeixi amb flanc de pujada i de baixada
-                EXTI_InitStruct.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
+                EXTI_InitStruct.EXTI_Trigger = EXTI_Trigger_Rising;
                 /* Add to EXTI */
                 EXTI_Init(&EXTI_InitStruct);
                 /* Add IRQ vector to NVIC */
@@ -276,8 +337,29 @@ void configuraGPIOG13() {
 	gpio.GPIO_Pin = GPIO_Pin_13 | GPIO_Pin_14;
 	gpio.GPIO_Mode = GPIO_Mode_OUT;
 	GPIO_Init(GPIOG, &gpio);
+	//GPIO_SetBits(GPIOG, GPIO_Pin_13);
 }
 
+
+void TIM6_DAC_IRQHandler(void) {
+  if (TIM_GetITStatus(TIM6, TIM_IT_Update) != RESET) {
+    TIM_ClearITPendingBit(TIM6, TIM_IT_Update);
+    tics++;
+    if (tics>=5){
+    	cont_10micros++; //cuenta cada diez micros
+    	tics=0;
+    }
+    if (cont_10micros>60000) cont_10micros=60000;
+
+
+	/*if (GPIO_ReadInputDataBit(GPIOG, GPIO_Pin_10) == 1){
+		cont_ms++;
+	} else{
+		velocidad = 60000/(cont_ms+1);
+		cont_ms=0;
+	}*/
+  }
+}
 
 void TIM2_IRQHandler(void){
   if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET){
@@ -296,6 +378,8 @@ void TIM2_IRQHandler(void){
 
 	  if (GPIO_ReadInputDataBit(GPIOA, USER_BUTTON) == TRUE){
 		  //Boto pulsat!!!
+		  btn_pressed = 1;
+
 
 		  milis_rebots++;
 		  if (milis_rebots == 100){
@@ -317,6 +401,7 @@ void TIM2_IRQHandler(void){
 	  } else{
 
 		  milis_rebots = 0;
+		  btn_pressed=0;
 		 // GPIO_ResetBits(GPIOG, GPIO_Pin_13);
 
 	  }
@@ -366,6 +451,28 @@ void TM_TIMER_Init(void) {
     TIM_TimeBaseInit(TIM4, &TIM_BaseStruct);
 	/* Start count on TIM4 */
     TIM_Cmd(TIM4, ENABLE);
+}
+
+
+void TM_TIMER6_Init(void) {
+	TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
+	NVIC_InitTypeDef NVIC_InitStructure;
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM6, ENABLE);
+	TIM_TimeBaseStructure.TIM_Prescaler = 1;
+	TIM_TimeBaseStructure.TIM_Period = 83;
+	TIM_TimeBaseStructure.TIM_ClockDivision = 1;
+	TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
+	TIM_TimeBaseStructure.TIM_RepetitionCounter = 0;
+	TIM_TimeBaseInit(TIM6, &TIM_TimeBaseStructure);
+	NVIC_InitStructure.NVIC_IRQChannel = TIM6_DAC_IRQn;
+	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 9;
+	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
+	NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+	NVIC_Init(&NVIC_InitStructure);
+	//USART_SendTextNL(USART1, ''TIMER SET UP'');
+	TIM_ITConfig(TIM6, TIM_IT_Update, ENABLE);
+	TIM_ClearITPendingBit(TIM6, TIM_IT_Update);
+	TIM_Cmd(TIM6, ENABLE);
 }
 
 void TM_PWM_Init(void) {
@@ -483,12 +590,15 @@ void inicialitza_sistema(void){
 	init_injector_a_interrupt();
 	init_injector_b_interrupt();
 	init_injector_c_interrupt();
+
+	TM_TIMER6_Init();
+	INTTIM_Config(1);
+	configuraGPIOG13();
+	Configure_PD1();
 }
 
 int main(void) {
 	inicialitza_sistema();
-	INTTIM_Config(1);
-    configuraGPIOG13();
     while(1) {}
     //TM_TIMER_Init(); //Timer4
 
