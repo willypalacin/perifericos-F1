@@ -1,4 +1,3 @@
-
 #include "stm32f4xx.h"
 
 //CONSTANTS
@@ -27,6 +26,7 @@ static uint16_t milis_rebots = 0;
 static uint16_t cont_10micros = 0;
 static uint16_t velocidad = 0;
 uint16_t cont_ms = 0;
+uint16_t t_inj = 0.25;
 
 
 
@@ -250,7 +250,7 @@ void EXTI2_IRQHandler(void) {
     if (EXTI_GetITStatus(EXTI_Line2) != RESET) {
                //Posem a 0 el flag de la interrupcio
                EXTI_ClearITPendingBit(EXTI_Line2);
-               //CODI
+               calcula_temps_injeccio();
     }
 }
 
@@ -260,7 +260,7 @@ void EXTI4_IRQHandler(void) {
     if (EXTI_GetITStatus(EXTI_Line4) != RESET) {
                //Posem a 0 el flag de la interrupcio
                EXTI_ClearITPendingBit(EXTI_Line4);
-               //CODI
+               calcula_temps_injeccio();
     }
 }
 
@@ -270,8 +270,41 @@ void EXTI9_5_IRQHandler(void) {
     if (EXTI_GetITStatus(EXTI_Line6) != RESET) {
                //Posem a 0 el flag de la interrupcio
                EXTI_ClearITPendingBit(EXTI_Line6);
-               //CODI
+               calcula_temps_injeccio();
     }
+}
+
+void calcula_temps_injeccio(void){
+	if (GPIO_ReadInputDataBit(GPIOD, INJECTOR_GPIO_C) != TRUE){
+		if (GPIO_ReadInputDataBit(GPIOD, INJECTOR_GPIO_B) != TRUE){
+			if (GPIO_ReadInputDataBit(GPIOD, INJECTOR_GPIO_A) != TRUE){
+				t_inj = 0.25;
+			} else{
+				t_inj = 0.50;
+			}
+		}else {
+			if (GPIO_ReadInputDataBit(GPIOD, INJECTOR_GPIO_A) != TRUE){
+				t_inj = 1;
+			} else{
+				t_inj = 2;
+			}
+		}
+	}else {
+		if (GPIO_ReadInputDataBit(GPIOD, INJECTOR_GPIO_B) != TRUE){
+			if (GPIO_ReadInputDataBit(GPIOD, INJECTOR_GPIO_A) != TRUE){
+				t_inj = 4;
+			} else{
+				t_inj = 8;
+			}
+		}else {
+			if (GPIO_ReadInputDataBit(GPIOD, INJECTOR_GPIO_A) != TRUE){
+				t_inj = 16;
+			} else{
+				t_inj = 32;
+			}
+		}
+	}
+
 }
 
 
