@@ -28,7 +28,7 @@ static uint16_t cont_10micros = 0;
 static uint16_t velocidad = 0;
 uint16_t cont_ms = 0;
 uint16_t t_inj = 0.25;
-
+uint16_t interrupcio = 0;
 
 
 
@@ -140,140 +140,6 @@ void Configure_PD1(void) {
     NVIC_Init(&NVIC_InitStruct);
 }
 
-//Configuració de la interrupció del injector a del switch
-void init_injector_a_interrupt(void){
-
-
-                //RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
-                EXTI_InitTypeDef EXTI_InitStruct;
-                NVIC_InitTypeDef NVIC_InitStruct;
-                /* Tell system that you will use PD2 for EXTI_Line2 */
-                SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOD, EXTI_PinSource2);
-                /* PD2 is connected to EXTI_Line2 */
-                EXTI_InitStruct.EXTI_Line = EXTI_Line2;
-                /* Enable interrupt */
-                EXTI_InitStruct.EXTI_LineCmd = ENABLE;
-                /* Interrupt mode */
-                EXTI_InitStruct.EXTI_Mode = EXTI_Mode_Interrupt;
-                /* Triggers on rising and falling edge */
-                //Posem que interrompeixi amb flanc de pujada i de baixada
-                EXTI_InitStruct.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
-                /* Add to EXTI */
-                EXTI_Init(&EXTI_InitStruct);
-                /* Add IRQ vector to NVIC */
-                /* PD2 is connected to EXTI_Line2, which has EXTI2_IRQn vector */
-                NVIC_InitStruct.NVIC_IRQChannel = EXTI2_IRQn;
-                /* Set priority */
-                NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 0x00;
-                /* Set sub priority */
-                NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0x00;
-                /* Enable interrupt */
-                NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
-                /* Add to NVIC */
-                NVIC_Init(&NVIC_InitStruct);
-
-}
-
-//Configuració de la interrupció del injector b del switch
-void init_injector_b_interrupt(void){
-
-
-                //RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
-
-                EXTI_InitTypeDef EXTI_InitStruct;
-                NVIC_InitTypeDef NVIC_InitStruct;
-                /* Tell system that you will use PD4 for EXTI_Line4 */
-                SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOD, EXTI_PinSource4);
-                /* PD4 is connected to EXTI_Line4 */
-                EXTI_InitStruct.EXTI_Line = EXTI_Line4;
-                /* Enable interrupt */
-                EXTI_InitStruct.EXTI_LineCmd = ENABLE;
-                /* Interrupt mode */
-                EXTI_InitStruct.EXTI_Mode = EXTI_Mode_Interrupt;
-                /* Triggers on rising and falling edge */
-                //Posem que interrompeixi amb flanc de pujada i de baixada
-                EXTI_InitStruct.EXTI_Trigger = EXTI_Trigger_Rising_Falling;
-                /* Add to EXTI */
-                EXTI_Init(&EXTI_InitStruct);
-                /* Add IRQ vector to NVIC */
-                /* PD4 is connected to EXTI_Line4, which has EXTI4_IRQn vector */
-                NVIC_InitStruct.NVIC_IRQChannel = EXTI4_IRQn;
-                /* Set priority */
-                //No li assignem cap prioritat
-                NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 0x00;
-                /* Set sub priority */
-                NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0x00;
-                /* Enable interrupt */
-                NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
-                /* Add to NVIC */
-                NVIC_Init(&NVIC_InitStruct);
-
-}
-
-//Configuració de la interrupció del injector c del switch
-void init_injector_c_interrupt(void){
-
-
-                //RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
-
-                EXTI_InitTypeDef EXTI_InitStruct;
-                NVIC_InitTypeDef NVIC_InitStruct;
-                /* Tell system that you will use PD6 for EXTI_Line6 */
-                SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOD, EXTI_PinSource6);
-                /* PD6 is connected to EXTI_Line6 */
-                EXTI_InitStruct.EXTI_Line = EXTI_Line6;
-                /* Enable interrupt */
-                EXTI_InitStruct.EXTI_LineCmd = ENABLE;
-                /* Interrupt mode */
-                EXTI_InitStruct.EXTI_Mode = EXTI_Mode_Interrupt;
-                /* Triggers on rising and falling edge */
-                //Posem que interrompeixi amb flanc de pujada i de baixada
-                EXTI_InitStruct.EXTI_Trigger = EXTI_Trigger_Rising;
-                /* Add to EXTI */
-                EXTI_Init(&EXTI_InitStruct);
-                /* Add IRQ vector to NVIC */
-                /* PD6 is connected to EXTI_Line6, which has EXTI2_IRQn vector */
-                NVIC_InitStruct.NVIC_IRQChannel = EXTI9_5_IRQn;
-                /* Set priority */
-                NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 0x00;
-                /* Set sub priority */
-                NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0x00;
-                /* Enable interrupt */
-                NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
-                /* Add to NVIC */
-                NVIC_Init(&NVIC_InitStruct);
-
-}
-
-//RSI del boto a del switch (INJECTOR A)
-void EXTI2_IRQHandler(void) {
-    //Mirem si s'ha interromput
-    if (EXTI_GetITStatus(EXTI_Line2) != RESET) {
-               //Posem a 0 el flag de la interrupcio
-               EXTI_ClearITPendingBit(EXTI_Line2);
-               calcula_temps_injeccio();
-    }
-}
-
-//RSI del boto b del switch (INJECTOR B)
-void EXTI4_IRQHandler(void) {
-    //Mirem si s'ha interromput
-    if (EXTI_GetITStatus(EXTI_Line4) != RESET) {
-               //Posem a 0 el flag de la interrupcio
-               EXTI_ClearITPendingBit(EXTI_Line4);
-               calcula_temps_injeccio();
-    }
-}
-
-//RSI del boto c del switch (INJECTOR C)
-void EXTI9_5_IRQHandler(void) {
-    //Mirem si s'ha interromput
-    if (EXTI_GetITStatus(EXTI_Line6) != RESET) {
-               //Posem a 0 el flag de la interrupcio
-               EXTI_ClearITPendingBit(EXTI_Line6);
-               calcula_temps_injeccio();
-    }
-}
 
 void calcula_temps_injeccio(void){
 	if (GPIO_ReadInputDataBit(GPIOD, INJECTOR_GPIO_C) != TRUE){
@@ -630,9 +496,19 @@ void inicialitza_sistema(void){
 	Configure_PD1();
 }
 
+void espera_interrupcio(void){
+	while(!interrupcio){
+		continue;
+	}
+	interrupcio = 0;
+}
+
 int main(void) {
 	inicialitza_sistema();
-    while(1) {}
-    //TM_TIMER_Init(); //Timer4
+    while(1) {
+    	calcula_temps_injeccio();
+    	espera_interrupcio();
+    }
+
 
 }
