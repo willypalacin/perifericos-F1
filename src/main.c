@@ -1,3 +1,4 @@
+
 #include "stm32f4xx.h"
 
 //CONSTANTS
@@ -84,7 +85,7 @@ void EXTI1_IRQHandler(void) {
     /* Make sure that interrupt flag is set */
     if (EXTI_GetITStatus(EXTI_Line1) != RESET) {
     	cont_ms=(uint16_t)cont_10micros/100;
-    	velocidad=(uint16_t)(60000/(cont_ms*2)); //xq cuenta cada 10 micros segun los tics
+    	velocidad= (6000000/(cont_10micros*2)); //xq cuenta cada 10 micros segun los tics
 
     	cont_10micros = 0;
 
@@ -399,7 +400,6 @@ void TIM2_IRQHandler(void){
 	  /*if(entra==0) {
 		  GPIO_SetBits(GPIOG, GPIO_Pin_13);
 		  entra = 1;
-
 	  } else {
 		  GPIO_ResetBits(GPIOG, GPIO_Pin_13);
 		  	  entra = 0;
