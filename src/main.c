@@ -27,7 +27,7 @@ static uint16_t milis_rebots = 0;
 static uint16_t cont_10micros = 0;
 static uint16_t velocidad = 0;
 uint16_t cont_ms = 0;
-uint16_t t_inj = 0.25;
+float t_inj = 0.25;
 uint16_t interrupcio = 0;
 
 
@@ -38,7 +38,7 @@ void init_switch(void){
                 GPIO_InitTypeDef gpio_a;
 
                 //El configurem en el GPIOD
-                RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
+                RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
 
                 GPIO_StructInit(&gpio_a);
                 gpio_a.GPIO_Pin = INJECTOR_GPIO_A;
@@ -47,13 +47,13 @@ void init_switch(void){
                 //Activem pull-up (pq simulem, no soldem switch)
                 gpio_a.GPIO_PuPd = GPIO_PuPd_UP;
                 //Carreguem configuració pin
-                GPIO_Init(GPIOD, &gpio_a);
+                GPIO_Init(GPIOA, &gpio_a);
 
 
                 GPIO_InitTypeDef gpio_b;
 
                 //El configurem en el GPIOD
-                RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
+                RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOB, ENABLE);
 
                 GPIO_StructInit(&gpio_b);
                 gpio_b.GPIO_Pin = INJECTOR_GPIO_B;
@@ -62,13 +62,13 @@ void init_switch(void){
                 //Activem pull-up (pq simulem, no soldem switch)
                 gpio_b.GPIO_PuPd = GPIO_PuPd_UP;
                 //Carreguem configuració pin
-                GPIO_Init(GPIOD, &gpio_b);
+                GPIO_Init(GPIOB, &gpio_b);
 
 
                 GPIO_InitTypeDef gpio_c;
 
                 //El configurem en el GPIOD
-                RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
+                RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOC, ENABLE);
 
                 GPIO_StructInit(&gpio_c);
                 gpio_c.GPIO_Pin = INJECTOR_GPIO_C;
@@ -77,13 +77,14 @@ void init_switch(void){
                 //Activem pull-up (pq simulem, no soldem switch)
                 gpio_c.GPIO_PuPd = GPIO_PuPd_UP;
                 //Carreguem configuració pin
-                GPIO_Init(GPIOD, &gpio_c);
+                GPIO_Init(GPIOC, &gpio_c);
 }
 
 void EXTI1_IRQHandler(void) {
 
     /* Make sure that interrupt flag is set */
     if (EXTI_GetITStatus(EXTI_Line1) != RESET) {
+    	interrupcio = 1;
     	cont_ms=(uint16_t)cont_10micros/100;
     	velocidad= (6000000/(cont_10micros*2)); //xq cuenta cada 10 micros segun los tics
 
@@ -142,29 +143,29 @@ void Configure_PD1(void) {
 
 
 void calcula_temps_injeccio(void){
-	if (GPIO_ReadInputDataBit(GPIOD, INJECTOR_GPIO_C) != TRUE){
-		if (GPIO_ReadInputDataBit(GPIOD, INJECTOR_GPIO_B) != TRUE){
-			if (GPIO_ReadInputDataBit(GPIOD, INJECTOR_GPIO_A) != TRUE){
+	if (GPIO_ReadInputDataBit(GPIOC, INJECTOR_GPIO_C) != TRUE){
+		if (GPIO_ReadInputDataBit(GPIOB, INJECTOR_GPIO_B) != TRUE){
+			if (GPIO_ReadInputDataBit(GPIOA, INJECTOR_GPIO_A) != TRUE){
 				t_inj = 0.25;
 			} else{
 				t_inj = 0.50;
 			}
 		}else {
-			if (GPIO_ReadInputDataBit(GPIOD, INJECTOR_GPIO_A) != TRUE){
+			if (GPIO_ReadInputDataBit(GPIOA, INJECTOR_GPIO_A) != TRUE){
 				t_inj = 1;
 			} else{
 				t_inj = 2;
 			}
 		}
 	}else {
-		if (GPIO_ReadInputDataBit(GPIOD, INJECTOR_GPIO_B) != TRUE){
-			if (GPIO_ReadInputDataBit(GPIOD, INJECTOR_GPIO_A) != TRUE){
+		if (GPIO_ReadInputDataBit(GPIOB, INJECTOR_GPIO_B) != TRUE){
+			if (GPIO_ReadInputDataBit(GPIOA, INJECTOR_GPIO_A) != TRUE){
 				t_inj = 4;
 			} else{
 				t_inj = 8;
 			}
 		}else {
-			if (GPIO_ReadInputDataBit(GPIOD, INJECTOR_GPIO_A) != TRUE){
+			if (GPIO_ReadInputDataBit(GPIOA, INJECTOR_GPIO_A) != TRUE){
 				t_inj = 16;
 			} else{
 				t_inj = 32;
@@ -486,14 +487,12 @@ void inicialitza_sistema(void){
 	TM_TIMER_Init();
 	TM_PWM_Init();
 	TM_LEDS_Init();
-	init_injector_a_interrupt();
-	init_injector_b_interrupt();
-	init_injector_c_interrupt();
 
 	TM_TIMER6_Init();
 	INTTIM_Config(1);
 	configuraGPIOG13();
 	Configure_PD1();
+	init_switch();
 }
 
 void espera_interrupcio(void){
@@ -512,3 +511,4 @@ int main(void) {
 
 
 }
+
