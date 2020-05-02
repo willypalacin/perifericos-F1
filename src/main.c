@@ -1,4 +1,3 @@
-
 #include "stm32f4xx.h"
 
 //CONSTANTS
@@ -12,6 +11,8 @@
 #define INJECTOR_GPIO_A GPIO_Pin_2
 #define INJECTOR_GPIO_B GPIO_Pin_4
 #define INJECTOR_GPIO_C GPIO_Pin_6
+#define SALIDA_TINJ GPIO_Pin_13
+
 
 
 
@@ -19,19 +20,17 @@
 static uint16_t tics = 0;
 uint16_t btn_pressed = 0;
 uint16_t rev_min = 0;
-uint16_t frec = 2000;
 uint16_t array_cargar[16] = {479,239,159,119,95,79,67,59,52,47,42,39,35,33,31};
 uint16_t flag_decrementa = 1;
-uint16_t entra = 0;
 static uint16_t milis_rebots = 0;
 static uint16_t cont_10micros = 0;
 static uint16_t velocidad = 0;
-uint16_t cont_ms = 0;
 uint16_t t_inj = 25;
 uint16_t interrupcio = 0;
 uint16_t count_tinj = 0;
-
-
+uint16_t Tim6_RSI;
+uint16_t Tim2_RSI;
+uint16_t EXTI1_RSI;
 
 
 //Configuració simuladors switch
@@ -74,28 +73,28 @@ void init_switch(void){
 }
 
 void EXTI1_IRQHandler(void) {
-    /* Make sure that interrupt flag is set */
+	EXTI1_RSI =	TIM_GetCounter(TIM5);
+    // comprobamos
     if (EXTI_GetITStatus(EXTI_Line1) != RESET) {
     	interrupcio = 1;
-    	cont_ms=(uint16_t)cont_10micros/100;
+
     	velocidad= (6000000/(cont_10micros*2)); //xq cuenta cada 10 micros segun los tics
+    	//limpiamos int
     	EXTI_ClearITPendingBit(EXTI_Line1);
     	cont_10micros = 0;
-        /* Clear interrupt flag */
-
     }
+    EXTI1_RSI = TIM_GetCounter(TIM5) - EXTI1_RSI;
 }
 
-void Configure_PD1(void) {
-    /* Set variables used */
+void ConfiguraPD1(void) {
     GPIO_InitTypeDef GPIO_InitStruct;
     EXTI_InitTypeDef EXTI_InitStruct;
     NVIC_InitTypeDef NVIC_InitStruct;
-    /* Enable clock for GPIOD */
+   //Activa clock
     RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
     /* Enable clock for SYSCFG */
     RCC_APB2PeriphClockCmd(RCC_APB2Periph_SYSCFG, ENABLE);
-    /* Set pin as input */
+    //Lectura Input
     GPIO_InitStruct.GPIO_Mode = GPIO_Mode_IN;
     GPIO_InitStruct.GPIO_OType = GPIO_OType_PP;
     GPIO_InitStruct.GPIO_Pin = GPIO_Pin_1;
@@ -103,33 +102,28 @@ void Configure_PD1(void) {
     GPIO_InitStruct.GPIO_Speed = GPIO_Speed_100MHz;
     GPIO_Init(GPIOD, &GPIO_InitStruct);
 
-    /* Tell system that you will use PD0 for EXTI_Line0 */
+    //Utilizremos la EXIT_line para el PD1
     SYSCFG_EXTILineConfig(EXTI_PortSourceGPIOD, EXTI_PinSource1);
 
-    /* PD0 is connected to EXTI_Line0 */
+    //PD1, esta conectado a EXIT1
     EXTI_InitStruct.EXTI_Line = EXTI_Line1;
-    /* Enable interrupt */
     EXTI_InitStruct.EXTI_LineCmd = ENABLE;
-    /* Interrupt mode */
+
     EXTI_InitStruct.EXTI_Mode = EXTI_Mode_Interrupt;
-    /* Triggers on rising and falling edge */
+    //La int sera por flanco subida
     EXTI_InitStruct.EXTI_Trigger = EXTI_Trigger_Rising;
-    /* Add to EXTI */
+    //anadimos a EXTI
     EXTI_Init(&EXTI_InitStruct);
 
-    /* Add IRQ vector to NVIC */
-    /* PD0 is connected to EXTI_Line0, which has EXTI0_IRQn vector */
+    // PD1 = EXTI1_IRQn
     NVIC_InitStruct.NVIC_IRQChannel = EXTI1_IRQn;
-    /* Set priority */
+    //No prioridad
     NVIC_InitStruct.NVIC_IRQChannelPreemptionPriority = 0x00;
-    /* Set sub priority */
+    //No subprioridad
     NVIC_InitStruct.NVIC_IRQChannelSubPriority = 0x00;
-    /* Enable interrupt */
     NVIC_InitStruct.NVIC_IRQChannelCmd = ENABLE;
-    /* Add to NVIC */
     NVIC_Init(&NVIC_InitStruct);
 }
-
 
 void calcula_temps_injeccio(void){
 	if (GPIO_ReadInputDataBit(GPIOC, INJECTOR_GPIO_C) != TRUE){
@@ -171,29 +165,50 @@ void delay(int counter)
 	for (i = 0; i < counter * 100000; i++) {}
 }
 
-void INTTIM_Config(uint16_t numOfMilleseconds){
+void configuraTimer2(uint16_t numOfMilleseconds){
   NVIC_InitTypeDef NVIC_InitStructure;
-  /* Enable the TIM2 gloabal Interrupt */
+  /* global interrupt */
   NVIC_InitStructure.NVIC_IRQChannel = TIM2_IRQn;
   NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
   NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
   NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
   NVIC_Init(&NVIC_InitStructure);
-  /* TIM2 clock enable */
   RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM2, ENABLE);
-  /* Time base configuration */
   TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
+  //Salta cada milisegundo * numOfMilleseconds.
   TIM_TimeBaseStructure.TIM_Period = (7*numOfMilleseconds);
   TIM_TimeBaseStructure.TIM_Prescaler = 10499;
-  //TIM_TimeBaseStructure.TIM_Prescaler = 168-1; //168MHz Clock should be down to 1MHz
+
   TIM_TimeBaseStructure.TIM_ClockDivision = 0;
   TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
   TIM_TimeBaseInit(TIM2, &TIM_TimeBaseStructure);
   TIM_ClearITPendingBit(TIM2, TIM_IT_Update);
-  /* TIM IT enable */
+
   TIM_ITConfig(TIM2, TIM_IT_Update, ENABLE);
-  /* TIM2 enable counter */
   TIM_Cmd(TIM2, ENABLE);
+}
+
+void configuraTimer5(){
+  NVIC_InitTypeDef NVIC_InitStructure;
+  /* global interrupt */
+  NVIC_InitStructure.NVIC_IRQChannel = TIM5_IRQn;
+  NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 0;
+  NVIC_InitStructure.NVIC_IRQChannelSubPriority = 1;
+  NVIC_InitStructure.NVIC_IRQChannelCmd = ENABLE;
+  NVIC_Init(&NVIC_InitStructure);
+  RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM5, ENABLE);
+  TIM_TimeBaseInitTypeDef  TIM_TimeBaseStructure;
+  //Salta cada milisegundo * numOfMilleseconds.
+  TIM_TimeBaseStructure.TIM_Period = 0xFFFFFFFF;
+  TIM_TimeBaseStructure.TIM_Prescaler = 1;
+
+  TIM_TimeBaseStructure.TIM_ClockDivision = 0;
+  TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
+  TIM_TimeBaseInit(TIM5, &TIM_TimeBaseStructure);
+  TIM_ClearITPendingBit(TIM5, TIM_IT_Update);
+
+  TIM_ITConfig(TIM5, TIM_IT_Update, ENABLE);
+  TIM_Cmd(TIM5, ENABLE);
 }
 
 
@@ -207,8 +222,19 @@ void configuraGPIOG13() {
 	//GPIO_SetBits(GPIOG, GPIO_Pin_13);
 }
 
+void configuraGPIOE() {
+	GPIO_InitTypeDef gpio;
+	RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOE, ENABLE);
+	GPIO_StructInit(&gpio);
+	gpio.GPIO_Pin = GPIO_Pin_2 | GPIO_Pin_3|GPIO_Pin_4;
+	gpio.GPIO_Mode = GPIO_Mode_OUT;
+	GPIO_Init(GPIOE, &gpio);
+
+}
+
 
 void TIM6_DAC_IRQHandler(void) {
+  Tim6_RSI =	TIM_GetCounter(TIM5);
   if (TIM_GetITStatus(TIM6, TIM_IT_Update) != RESET) {
     TIM_ClearITPendingBit(TIM6, TIM_IT_Update);
     tics++;
@@ -217,16 +243,16 @@ void TIM6_DAC_IRQHandler(void) {
     	tics=0;
     	if(interrupcio==1) {
     		count_tinj++;
-
     	}
-
     }
     if (cont_10micros>60000) cont_10micros=60000;
   }
 
+  Tim6_RSI = TIM_GetCounter(TIM5) - Tim6_RSI;
 }
 
 void TIM2_IRQHandler(void){
+	Tim2_RSI =	TIM_GetCounter(TIM5);
   if (TIM_GetITStatus(TIM2, TIM_IT_Update) != RESET){
 	  /*if(entra==0) {
 		  GPIO_SetBits(GPIOG, GPIO_Pin_13);
@@ -246,77 +272,46 @@ void TIM2_IRQHandler(void){
 			  if (rev_min == 15)  flag_decrementa = -1;
 			  if (rev_min == 0) flag_decrementa = 1;
 			  rev_min = (rev_min + flag_decrementa);
-			  TM_TIMER_Init();
-			  TM_PWM_Init();
-			  TM_LEDS_Init();
+			  inicia_Timer4();
+			  configuraDutyPWM();
+			  inicializaLedPWM();
 			  //GPIO_SetBits(GPIOG, GPIO_Pin_13);
 		  }
-
 	  } else{
-
 		  milis_rebots = 0;
 		  btn_pressed=0;
 		 // GPIO_ResetBits(GPIOG, GPIO_Pin_13);
-
 	  }
-	  //INTTIM_Config(100);*/
-
+	  //configuraTimer2(100);*/
   }
+  Tim2_RSI = TIM_GetCounter(TIM5)- Tim2_RSI;
 }
 
-void TM_TIMER_Init(void) {
+void inicia_Timer4(void) {
 	TIM_TimeBaseInitTypeDef TIM_BaseStruct;
-	/* Enable clock for TIM4 */
-	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE);
-/*
-	TIM4 is connected to APB1 bus, which has on F407 device 42MHz clock
-	But, timer has internal PLL, which double this frequency for timer, up to 84MHz
-	Remember: Not each timer is connected to APB1, there are also timers connected
-	on APB2, which works at 84MHz by default, and internal PLL increase
-	this to up to 168MHz
-	Set timer prescaller
-	Timer count frequency is set with
-	timer_tick_frequency = Timer_default_frequency / (prescaller_set + 1)
-	In our case, we want a max frequency for timer, so we set prescaller to 0
-	And our timer will have tick frequency
-	timer_tick_frequency = 84000000 / (0 + 1) = 84000000
-*/
-	TIM_BaseStruct.TIM_Prescaler = 10499;
-	/* Count up */
+	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM4, ENABLE); //Activamos el clock para el timer4
+	TIM_BaseStruct.TIM_Prescaler = 10499; //Reducimos la frecuencia aprox 16Mhz
     TIM_BaseStruct.TIM_CounterMode = TIM_CounterMode_Up;
-/*
-	Set timer period when it have reset
-	First you have to know max value for timer
-	In our case it is 16bit = 65535
-	To get your frequency for PWM, equation is simple
-	PWM_frequency = timer_tick_frequency / (TIM_Period + 1)
-	If you know your PWM frequency you want to have timer period set correct
-	TIM_Period = timer_tick_frequency / PWM_frequency - 1
-	In our case, for 10Khz PWM_frequency, set Period to
-	TIM_Period = 84000000 / 10000 - 1 = 8399
-	If you get TIM_Period larger than max timer value (in our case 65535),
-	you have to choose larger prescaler and slow down timer tick frequency
-*/
-    TIM_BaseStruct.TIM_Period = array_cargar[rev_min]; //El 16 es del prescaler.
+    /* Tenemos este array preconfigurado, de forma que aumentamos su valor, si se pulsa el pulsador */
+    TIM_BaseStruct.TIM_Period = array_cargar[rev_min];
     TIM_BaseStruct.TIM_ClockDivision = TIM_CKD_DIV1;
     TIM_BaseStruct.TIM_RepetitionCounter = 0;
-	/* Initialize TIM4 */
     TIM_TimeBaseInit(TIM4, &TIM_BaseStruct);
-	/* Start count on TIM4 */
     TIM_Cmd(TIM4, ENABLE);
 }
 
-
-void TM_TIMER6_Init(void) {
+void inicializaTimer6(void) {
 	TIM_TimeBaseInitTypeDef TIM_TimeBaseStructure;
 	NVIC_InitTypeDef NVIC_InitStructure;
 	RCC_APB1PeriphClockCmd(RCC_APB1Periph_TIM6, ENABLE);
 	TIM_TimeBaseStructure.TIM_Prescaler = 1;
+	//Salta cada 2 micros
 	TIM_TimeBaseStructure.TIM_Period = 83;
 	TIM_TimeBaseStructure.TIM_ClockDivision = 1;
 	TIM_TimeBaseStructure.TIM_CounterMode = TIM_CounterMode_Up;
 	TIM_TimeBaseStructure.TIM_RepetitionCounter = 0;
 	TIM_TimeBaseInit(TIM6, &TIM_TimeBaseStructure);
+	//Nombre de la IRQ
 	NVIC_InitStructure.NVIC_IRQChannel = TIM6_DAC_IRQn;
 	NVIC_InitStructure.NVIC_IRQChannelPreemptionPriority = 9;
 	NVIC_InitStructure.NVIC_IRQChannelSubPriority = 0;
@@ -328,48 +323,34 @@ void TM_TIMER6_Init(void) {
 	TIM_Cmd(TIM6, ENABLE);
 }
 
-void TM_PWM_Init(void) {
+void configuraDutyPWM(void) {
     TIM_OCInitTypeDef TIM_OCStruct;
-
-    /* Common settings */
-
-    /* PWM mode 2 = Clear on compare match */
-    /* PWM mode 1 = Set on compare match */
     TIM_OCStruct.TIM_OCMode = TIM_OCMode_PWM2;
     TIM_OCStruct.TIM_OutputState = TIM_OutputState_Enable;
     TIM_OCStruct.TIM_OCPolarity = TIM_OCPolarity_Low;
-
+    //Declaramos los tics segun las rpm a las que estemos
     uint16_t max_tics = array_cargar[rev_min];
-
-/*
-    To get proper duty cycle, you have simple equation
-    pulse_length = ((TIM_Period + 1) * DutyCycle) / 100 - 1
-    where DutyCycle is in percent, between 0 and 100%
-    25% duty cycle:     pulse_length = ((8399 + 1) * 25) / 100 - 1 = 2099
-    50% duty cycle:     pulse_length = ((8399 + 1) * 50) / 100 - 1 = 4199
-    75% duty cycle:     pulse_length = ((8399 + 1) * 75) / 100 - 1 = 6299
-    100% duty cycle:    pulse_length = ((8399 + 1) * 100) / 100 - 1 = 8399
-    Remember: if pulse_length is larger than TIM_Period, you will have output HIGH all the time
-*/      uint16_t  pulse_length = ((max_tics + 1) * 25) / 100 - 1;
-
-
-        pulse_length = ((max_tics + 1) * 54) / 100 - 1;
-        TIM_OCStruct.TIM_Pulse = pulse_length; /* 50% duty cycle */
-        TIM_OC2Init(TIM4, &TIM_OCStruct);
-        TIM_OC2PreloadConfig(TIM4, TIM_OCPreload_Enable);
-
+    //Generamos uestro pwm con duty del 54
+    uint16_t  pwm = ((max_tics + 1) * 25) / 100 - 1;
+    pwm = ((max_tics + 1) * 54) / 100 - 1;
+    TIM_OCStruct.TIM_Pulse = pwm;
+    TIM_OC2Init(TIM4, &TIM_OCStruct);
+    //Asociamos con TIM4
+    TIM_OC2PreloadConfig(TIM4, TIM_OCPreload_Enable);
 
 }
 
-void TM_LEDS_Init(void) {
+void inicializaLedPWM(void) {
 	GPIO_InitTypeDef GPIO_InitStruct;
-	    /* Clock for GPIOD */
+
+	//Ponemos clock para GPIOD
 	    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOD, ENABLE);
-	    /* Alternating functions for pins */
+
+	    //Asoc con Timer4
 	    GPIO_PinAFConfig(GPIOD, GPIO_PinSource12, GPIO_AF_TIM4);
 	    GPIO_PinAFConfig(GPIOD, GPIO_PinSource13, GPIO_AF_TIM4);
 
-	    /* Set pins */
+	    //Utilizamos estos dos pins. Solo Pin 13 es el que saca 54 por ciento de duty
 	    GPIO_InitStruct.GPIO_Pin = GPIO_Pin_12 | GPIO_Pin_13;
 	    GPIO_InitStruct.GPIO_OType = GPIO_OType_PP;
 	    GPIO_InitStruct.GPIO_PuPd = GPIO_PuPd_NOPULL;
@@ -377,7 +358,6 @@ void TM_LEDS_Init(void) {
 	    GPIO_InitStruct.GPIO_Speed = GPIO_Speed_100MHz;
 	    GPIO_Init(GPIOD, &GPIO_InitStruct);
 }
-
 
 void init_clock(void) {
 	RCC_DeInit();
@@ -415,14 +395,16 @@ void init_button(void){
 void inicialitza_sistema(void){
 	init_clock();
 	init_button();
-	TM_TIMER_Init();
-	TM_PWM_Init();
-	TM_LEDS_Init();
-	TM_TIMER6_Init();
-	INTTIM_Config(1);
+	inicia_Timer4();
+	configuraDutyPWM();
+	inicializaLedPWM();
+	inicializaTimer6();
+	configuraTimer2(1);
+	configuraTimer5();
 	configuraGPIOG13();
-	Configure_PD1();
+	ConfiguraPD1();
 	init_switch();
+	configuraGPIOE();
 }
 
 void espera_interrupcio(void){
@@ -430,13 +412,12 @@ void espera_interrupcio(void){
 		continue;
 	}
 	GPIO_SetBits(GPIOG, GPIO_Pin_13);
+	//Contamos hasta llegar al valor max del tiempo de inyeccion
 	if(count_tinj>t_inj) {
 		count_tinj=0;
 	    GPIO_ResetBits(GPIOG, GPIO_Pin_13);
 	    interrupcio=0;
-
 	 }
-
 }
 
 int main(void) {
